@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Volta ao Bairro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500&display=swap">
+<style>
+  /* Mapa de ruas à noite: um só ambiente, com o mapa a ocupar o protagonismo. */
+  :root {
+    color-scheme: dark;
+    --noite: #16212a;
+    --quarteirao: #22313c;
+    --casa: #34495a;
+    --casa-clara: #41596c;
+    --jardim: #2c6a4c;
+    --arvore: #4ba873;
+    --asfalto: #5a6b78;
+    --tracejado: #8496a3;
+    --percorrida: #f4b73a;
+    --corredor: #ff6a4d;
+    --texto: #eef3f6;
+    --texto-suave: #a9bac6;
+    --titulo: "Barlow Condensed", "Arial Narrow", sans-serif;
+    --corpo: "Barlow", "Segoe UI", sans-serif;
+  }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--noite); color: var(--texto); font-family: var(--corpo); }
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding-block: 24px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid;
+    gap: 14px;
+  }
+  header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 8px 24px; }
+  h1 { margin: 0; font: 700 clamp(2rem, 6vw, 2.8rem)/1 var(--titulo); letter-spacing: .01em; text-wrap: balance; }
+  dl { margin: 0; display: flex; gap: 24px; }
+  dl div { display: grid; gap: 2px; }
+  dt { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--texto-suave); }
+  dd { margin: 0; font: 600 1.7rem/1 var(--titulo); font-variant-numeric: tabular-nums; }
+  canvas { display: block; width: 100%; max-width: 100%; height: auto; border-radius: 4px; }
+  canvas:focus-visible { outline: 2px solid var(--percorrida); outline-offset: 3px; }
+  p { margin: 0; color: var(--texto-suave); line-height: 1.5; }
+  section { display: grid; gap: 8px; }
+  h2 { margin: 0; font: 600 1.5rem/1.1 var(--titulo); }
+  ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+  li {
+    display: grid;
+    grid-template-columns: 1.5em 1.5fr 1fr 1fr 1.5fr;
+    gap: 8px;
+    padding: 6px 8px;
+    background: var(--quarteirao);
+    font-variant-numeric: tabular-nums;
+  }
+  li span { min-width: 0; overflow-wrap: anywhere; }
+  [hidden] { display: none !important; }
+  form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+  label { display: grid; gap: 4px; flex: 1 1 200px; color: var(--texto-suave); }
+  input {
+    padding: 8px;
+    border: 1px solid var(--tracejado);
+    border-radius: 4px;
+    background: var(--quarteirao);
+    color: var(--texto);
+    font: inherit;
+    font-size: 1rem;
+  }
+  form button {
+    padding: 9px 14px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--percorrida);
+    color: var(--noite);
+    font: inherit;
+    font-weight: 500;
+  }
+  form button[type="button"] { background: var(--casa-clara); color: var(--texto); }
+  input:focus-visible, form button:focus-visible { outline: 2px solid var(--corredor); outline-offset: 1px; }
+  li.tua { outline: 2px solid var(--percorrida); outline-offset: -2px; }
+  #comandos { display: none; grid-template-columns: repeat(3, 56px); gap: 6px; justify-content: center; }
+  #comandos button {
+    height: 56px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--casa-clara);
+    color: var(--texto);
+    font-size: 1.4rem;
+  }
+  #comandos button:focus-visible { outline: 2px solid var(--percorrida); }
+  #cima { grid-column: 2; }
+  #esquerda { grid-column: 1; grid-row: 2; }
+  #baixo { grid-column: 2; grid-row: 2; }
+  #direita { grid-column: 3; grid-row: 2; }
+  @media (pointer: coarse) { #comandos { display: grid; } }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <h1>Volta ao Bairro</h1>
+    <dl>
+      <div><dt>Mapa</dt><dd id="mapa-atual">1 de 5</dd></div>
+      <div><dt>Tempo</dt><dd id="tempo">0,0 s</dd></div>
+      <div><dt>Ruas</dt><dd id="ruas">0</dd></div>
+    </dl>
+  </header>
+  <canvas id="mapa" width="1740" height="1080" tabindex="0" aria-label="Mapa do bairro"></canvas>
+  <p id="mensagem" aria-live="polite">Clica no mapa e usa as setas. São 5 bairros: percorre todas as ruas sem repetir nenhuma. Cada rua que faltar soma 5 segundos ao teu tempo. A tecla R recomeça.</p>
+  <div id="comandos">
+    <button id="cima" type="button" aria-label="Cima">↑</button>
+    <button id="esquerda" type="button" aria-label="Esquerda">←</button>
+    <button id="baixo" type="button" aria-label="Baixo">↓</button>
+    <button id="direita" type="button" aria-label="Direita">→</button>
+  </div>
+  <form id="formulario" hidden>
+    <label for="nome">Entraste no top 5! Escreve o teu nome
+      <input id="nome" type="text" maxlength="16" autocomplete="off">
+    </label>
+    <button type="submit">Guardar</button>
+    <button id="nome-aleatorio" type="button">Nome aleatório</button>
+  </form>
+  <section id="ranking" hidden>
+    <h2>5 melhores resultados</h2>
+    <ol id="lista"></ol>
+  </section>
+</main>
+
+<script>
+  const COLUNAS = 8;
+  const LINHAS = 5;
+  const LADO = 110;
+  const MARGEM = 50;
+  const DURACAO = 130;
+  const NOMES = ["Raposa", "Coruja", "Lince", "Gaivota", "Lontra", "Texugo", "Andorinha", "Golfinho", "Esquilo", "Pardal"];
+  const MAPAS_POR_CORRIDA = 5;
+  const PENALIZACAO = 5000;
+
+  // Troços sem rua. Só o início e o fim têm um número ímpar de ruas, e é isso
+  // que garante que o bairro tem solução.
+  const MAPA_INICIAL = {
+    cortes: new Set("0,0|0,1;0,0|1,0;0,2|0,3;0,3|0,4;0,4|1,4;2,0|3,0;2,1|2,2;2,1|3,1;2,2|2,3;2,3|3,3;2,4|3,4;3,1|4,1;3,3|4,3;4,0|5,0;4,1|5,1;4,3|5,3;4,4|5,4;5,1|5,2;5,2|5,3;6,0|7,0;6,4|7,4;7,0|7,1;7,1|7,2;7,3|7,4".split(";")),
+    jardins: ["0,0", "2,0", "4,0", "6,0", "2,1", "4,1", "2,2", "4,2", "0,3", "2,3", "4,3", "6,3"],
+    inicio: { x: 0, y: 3 },
+  };
+
+  const canvas = document.getElementById("mapa");
+  const ctx = canvas.getContext("2d");
+  const cor = nome => getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
+  const CORES = {};
+  for (const nome of ["noite", "quarteirao", "casa", "casa-clara", "jardim", "arvore", "asfalto", "tracejado", "percorrida", "corredor"]) {
+    CORES[nome] = cor("--" + nome);
+  }
+
+  function idRua(a, b) {
+    const [p, q] = a.x < b.x || a.y < b.y ? [a, b] : [b, a];
+    return `${p.x},${p.y}|${q.x},${q.y}`;
+  }
+
+  function existeRua(a, b) {
+    const dentro = b.x >= 0 && b.x < COLUNAS && b.y >= 0 && b.y < LINHAS;
+    return dentro && !mapa.cortes.has(idRua(a, b));
+  }
+
+  function todasAsRuas() {
+    const ruas = [];
+    for (let y = 0; y < LINHAS; y++) {
+      for (let x = 0; x < COLUNAS; x++) {
+        const a = { x, y };
+        for (const b of [{ x: x + 1, y }, { x, y: y + 1 }]) {
+          if (existeRua(a, b)) ruas.push([a, b]);
+        }
+      }
+    }
+    return ruas;
+  }
+
+  function aleatorio(n) {
+    return Math.floor(Math.random() * n);
+  }
+
+  function baralhar(lista) {
+    for (let i = lista.length - 1; i > 0; i--) {
+      const j = aleatorio(i + 1);
+      [lista[i], lista[j]] = [lista[j], lista[i]];
+    }
+    return lista;
+  }
+
+  const chave = p => `${p.x},${p.y}`;
+
+  function vizinhos(ruas) {
+    const lista = new Map();
+    for (const id of ruas) {
+      const [a, b] = id.split("|");
+      if (!lista.has(a)) lista.set(a, []);
+      if (!lista.has(b)) lista.set(b, []);
+      lista.get(a).push(b);
+      lista.get(b).push(a);
+    }
+    return lista;
+  }
+
+  function alcancaveis(lista, origem) {
+    const vistos = new Set([origem]);
+    const porVer = [origem];
+    while (porVer.length) {
+      for (const v of lista.get(porVer.pop()) || []) {
+        if (!vistos.has(v)) {
+          vistos.add(v);
+          porVer.push(v);
+        }
+      }
+    }
+    return vistos;
+  }
+
+  function caminhoMaisCurto(lista, de, ate) {
+    if (!lista.has(de)) return null;
+    const pai = new Map([[de, null]]);
+    const fila = [de];
+    for (const v of fila) {
+      if (v === ate) break;
+      for (const u of baralhar([...lista.get(v)])) {
+        if (!pai.has(u)) {
+          pai.set(u, v);
+          fila.push(u);
+        }
+      }
+    }
+    if (!pai.has(ate)) return null;
+    const caminho = [];
+    for (let v = ate; pai.get(v) !== null; v = pai.get(v)) {
+      const p = v.split(",").map(Number);
+      const q = pai.get(v).split(",").map(Number);
+      caminho.push(idRua({ x: p[0], y: p[1] }, { x: q[0], y: q[1] }));
+    }
+    return caminho;
+  }
+
+  function jardinsDe(cortes) {
+    const jardins = [];
+    for (let y = 0; y < LINHAS - 1; y++) {
+      for (let x = 0; x < COLUNAS - 1; x++) {
+        const lados = [
+          [{ x, y }, { x: x + 1, y }],
+          [{ x, y: y + 1 }, { x: x + 1, y: y + 1 }],
+          [{ x, y }, { x, y: y + 1 }],
+          [{ x: x + 1, y }, { x: x + 1, y: y + 1 }],
+        ];
+        if (lados.filter(([a, b]) => cortes.has(idRua(a, b))).length >= 2) jardins.push(`${x},${y}`);
+      }
+    }
+    return jardins;
+  }
+
+  // Divide o bairro em três zonas ligadas por uma só rua, escolhe o início e o
+  // fim, e tira ruas até só esses dois cruzamentos terem um número ímpar de ruas.
+  function tentarMapa() {
+    const todas = [];
+    for (let y = 0; y < LINHAS; y++) {
+      for (let x = 0; x < COLUNAS; x++) {
+        if (x + 1 < COLUNAS) todas.push(idRua({ x, y }, { x: x + 1, y }));
+        if (y + 1 < LINHAS) todas.push(idRua({ x, y }, { x, y: y + 1 }));
+      }
+    }
+    const ponte1 = aleatorio(LINHAS);
+    const ponte2 = aleatorio(LINHAS);
+    const ruas = new Set(todas);
+    for (let y = 0; y < LINHAS; y++) {
+      if (y !== ponte1) ruas.delete(`2,${y}|3,${y}`);
+      if (y !== ponte2) ruas.delete(`4,${y}|5,${y}`);
+    }
+    const inicio = { x: aleatorio(3), y: aleatorio(LINHAS) };
+    const fim = { x: 5 + aleatorio(3), y: aleatorio(LINHAS) };
+    const extremos = new Set([chave(inicio), chave(fim)]);
+    const graus = vizinhos(ruas);
+    const aCorrigir = [...graus.keys()].filter(v => (graus.get(v).length % 2 === 1) !== extremos.has(v));
+    for (const zona of [[0, 2], [3, 4], [5, 7]]) {
+      const grupo = aCorrigir.filter(v => {
+        const x = Number(v.split(",")[0]);
+        return x >= zona[0] && x <= zona[1];
+      });
+      if (grupo.length % 2 === 1) return null;
+      baralhar(grupo);
+      for (let i = 0; i < grupo.length; i += 2) {
+        const caminho = caminhoMaisCurto(vizinhos(ruas), grupo[i], grupo[i + 1]);
+        if (!caminho) return null;
+        caminho.forEach(id => ruas.delete(id));
+      }
+    }
+    const lista = vizinhos(ruas);
+    const impares = [...lista.keys()].filter(v => lista.get(v).length % 2 === 1);
+    const ligado = lista.has(chave(inicio)) && alcancaveis(lista, chave(inicio)).size === lista.size;
+    if (ruas.size < 38 || !ligado || impares.length !== 2 || !impares.every(v => extremos.has(v))) return null;
+    const cortes = new Set(todas.filter(id => !ruas.has(id)));
+    return { cortes, jardins: jardinsDe(cortes), inicio, ruas };
+  }
+
+  // Simula jogadores ao acaso para medir a dificuldade de um mapa.
+  function taxaDeVitoria(candidato) {
+    const lista = vizinhos(candidato.ruas);
+    const par = (a, b) => (a < b ? a + "|" + b : b + "|" + a);
+    let vitorias = 0;
+    for (let jogos = 0; jogos < 80; jogos++) {
+      const usadas = new Set();
+      let pos = chave(candidato.inicio);
+      for (;;) {
+        const saidas = lista.get(pos).filter(v => !usadas.has(par(pos, v)));
+        if (!saidas.length) break;
+        const proxima = saidas[aleatorio(saidas.length)];
+        usadas.add(par(pos, proxima));
+        pos = proxima;
+      }
+      if (usadas.size === candidato.ruas.size) vitorias++;
+    }
+    return vitorias / 80;
+  }
+
+  // Gera vários candidatos e fica com o mais difícil.
+  function gerarMapa() {
+    let melhor = MAPA_INICIAL;
+    let menorTaxa = Infinity;
+    let candidatos = 0;
+    for (let i = 0; i < 5000 && candidatos < 15; i++) {
+      const novo = tentarMapa();
+      if (!novo) continue;
+      candidatos++;
+      const taxa = taxaDeVitoria(novo);
+      if (taxa < menorTaxa) {
+        melhor = novo;
+        menorTaxa = taxa;
+      }
+    }
+    return melhor;
+  }
+
+  let mapa = MAPA_INICIAL;
+  let RUAS = todasAsRuas();
+  let jogo;
+  let corrida;
+
+  // Um par de cores por nível: quarteirões e jardins.
+  const TEMAS = [
+    { noite: "#16212a", quarteirao: "#22313c", casa: "#34495a", "casa-clara": "#41596c", jardim: "#2c6a4c", arvore: "#4ba873", asfalto: "#5a6b78", tracejado: "#8496a3", percorrida: "#f4b73a", corredor: "#ff6a4d" },
+    { noite: "#24162c", quarteirao: "#37233f", casa: "#4d3457", "casa-clara": "#624670", jardim: "#a8417a", arvore: "#e07fb1", asfalto: "#75607f", tracejado: "#a593ad", percorrida: "#ffd166", corredor: "#4de0d0" },
+    { noite: "#2a1b14", quarteirao: "#40291e", casa: "#5a3b2b", "casa-clara": "#704c38", jardim: "#6b7a2a", arvore: "#a8bb4c", asfalto: "#836a5b", tracejado: "#b09a8c", percorrida: "#ffe08a", corredor: "#4dc3ff" },
+    { noite: "#0f2a2e", quarteirao: "#173f44", casa: "#235a60", "casa-clara": "#2e7278", jardim: "#c46a1f", arvore: "#f2a154", asfalto: "#5b7f83", tracejado: "#93b1b4", percorrida: "#fff07a", corredor: "#ff5c8a" },
+    { noite: "#1c1c24", quarteirao: "#2b2b36", casa: "#3f3f4e", "casa-clara": "#525264", jardim: "#5b3fb5", arvore: "#9c84f0", asfalto: "#6c6c7e", tracejado: "#a3a3b5", percorrida: "#7df0a8", corredor: "#ff8a3d" },
+  ];
+
+  function aplicarTema() {
+    const tema = TEMAS[corrida.mapas];
+    Object.assign(CORES, tema);
+    for (const nome in tema) document.documentElement.style.setProperty("--" + nome, tema[nome]);
+  }
+
+  function iniciarMapa() {
+    aplicarTema();
+    RUAS = todasAsRuas();
+    jogo = { pos: { ...mapa.inicio }, destino: null, progresso: 0, seguinte: null, percorridas: new Set(), inicio: null, fim: null };
+  }
+
+  function novoJogo() {
+    corrida = { mapas: 0, tempo: 0, falhadas: 0 };
+    mapa = MAPA_INICIAL;
+    iniciarMapa();
+    document.getElementById("mensagem").textContent = "Clica no mapa e usa as setas. São 5 bairros: percorre todas as ruas sem repetir nenhuma. Cada rua que faltar soma 5 segundos ao teu tempo. A tecla R recomeça.";
+    document.getElementById("ranking").hidden = true;
+  }
+
+  function temSaida(p) {
+    return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
+      const alvo = { x: p.x + dx, y: p.y + dy };
+      return existeRua(p, alvo) && !jogo.percorridas.has(idRua(p, alvo));
+    });
+  }
+
+  // Ganha o menor tempo total, já com as penalizações.
+  function ordenar(resultados) {
+    return [...resultados].sort((a, b) => a.tempo - b.tempo);
+  }
+
+  const baseDeDados = window.claude ? window.claude.use("db").catch(() => null) : Promise.resolve(null);
+
+  function lerLocal() {
+    try {
+      return JSON.parse(localStorage.getItem("volta-ao-bairro-v5")) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  // Quem não pode gravar na base de dados da página fica com o resultado neste browser.
+  async function guardarResultado(resultado) {
+    const db = await baseDeDados;
+    try {
+      if (db) return await db.collection("resultados-v5").add(resultado);
+    } catch {}
+    try {
+      localStorage.setItem("volta-ao-bairro-v5", JSON.stringify([...lerLocal(), resultado]));
+    } catch {}
+  }
+
+  async function lerResultados() {
+    const db = await baseDeDados;
+    const locais = lerLocal();
+    if (!db) return locais;
+    try {
+      const resposta = await db.collection("resultados-v5").get();
+      return [...resposta.docs.map(doc => doc.data()), ...locais];
+    } catch {
+      return locais;
+    }
+  }
+
+  function mostrarRanking(resultados, meu) {
+    const lista = document.getElementById("lista");
+    lista.replaceChildren();
+    ordenar(resultados).slice(0, 5).forEach((r, i) => {
+      const li = document.createElement("li");
+      if (r.data === meu.data) li.className = "tua";
+      const data = new Date(r.data).toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short" });
+      for (const texto of [i + 1, r.nome || "Sem nome", textoTempo(r.tempo), `${r.falhadas} ${r.falhadas === 1 ? "falhada" : "falhadas"}`, data]) {
+        const coluna = document.createElement("span");
+        coluna.textContent = texto;
+        li.append(coluna);
+      }
+      lista.append(li);
+    });
+    document.getElementById("ranking").hidden = false;
+  }
+
+  async function terminar(agora) {
+    jogo.fim = agora;
+    const mensagem = document.getElementById("mensagem");
+    const meu = { tempo: Math.round(tempoTotal(agora)), falhadas: corrida.falhadas, data: new Date().toISOString() };
+    mensagem.textContent = `Corrida terminada: ${textoTempo(meu.tempo)}, com ${corrida.falhadas} ${corrida.falhadas === 1 ? "rua falhada" : "ruas falhadas"}. A tecla R recomeça.`;
+    const entra = ordenar([...await lerResultados(), meu]).slice(0, 5).includes(meu);
+    if (entra) return pedirNome(meu);
+    meu.nome = nomeAleatorio();
+    registar(meu);
+  }
+
+  function nomeAleatorio() {
+    return NOMES[aleatorio(NOMES.length)] + aleatorio(10);
+  }
+
+  async function registar(resultado) {
+    await guardarResultado(resultado);
+    mostrarRanking(await lerResultados(), resultado);
+  }
+
+  let porNomear = null;
+
+  function pedirNome(resultado) {
+    porNomear = resultado;
+    const campo = document.getElementById("nome");
+    campo.value = "";
+    document.getElementById("formulario").hidden = false;
+    campo.focus();
+  }
+
+  function fecharNome(nome) {
+    const resultado = porNomear;
+    porNomear = null;
+    document.getElementById("formulario").hidden = true;
+    resultado.nome = nome || nomeAleatorio();
+    registar(resultado);
+    canvas.focus();
+  }
+
+  function acabarMapa(agora) {
+    const faltam = RUAS.length - jogo.percorridas.size;
+    corrida.mapas++;
+    corrida.tempo += agora - jogo.inicio;
+    corrida.falhadas += faltam;
+    jogo.inicio = null;
+    jogo.seguinte = null;
+    if (corrida.mapas === MAPAS_POR_CORRIDA) return terminar(agora);
+    mapa = gerarMapa();
+    iniciarMapa();
+    const resultado = faltam === 0 ? "Mapa completo!" : `${faltam === 1 ? "Faltou 1 rua" : `Faltaram ${faltam} ruas`}: mais ${textoTempo(faltam * PENALIZACAO)}.`;
+    document.getElementById("mensagem").textContent = `${resultado} Este é o mapa ${corrida.mapas + 1} de ${MAPAS_POR_CORRIDA}.`;
+  }
+
+  // Inclui as penalizações e o tempo do mapa em curso.
+  function tempoTotal(agora) {
+    const atual = jogo.inicio === null ? 0 : agora - jogo.inicio;
+    return corrida.tempo + corrida.falhadas * PENALIZACAO + atual;
+  }
+
+  function mover(dx, dy) {
+    if (jogo.fim !== null) return;
+    if (jogo.destino) {
+      jogo.seguinte = { dx, dy };
+      return;
+    }
+    const alvo = { x: jogo.pos.x + dx, y: jogo.pos.y + dy };
+    if (!existeRua(jogo.pos, alvo) || jogo.percorridas.has(idRua(jogo.pos, alvo))) return;
+    if (jogo.inicio === null) jogo.inicio = performance.now();
+    jogo.percorridas.add(idRua(jogo.pos, alvo));
+    jogo.destino = alvo;
+    jogo.progresso = 0;
+  }
+
+  function atualizar(dt, agora) {
+    if (jogo.destino) {
+      jogo.progresso += dt / DURACAO;
+      if (jogo.progresso >= 1) {
+        jogo.pos = jogo.destino;
+        jogo.destino = null;
+        if (!temSaida(jogo.pos)) {
+          acabarMapa(agora);
+        } else if (jogo.seguinte) {
+          const { dx, dy } = jogo.seguinte;
+          jogo.seguinte = null;
+          mover(dx, dy);
+        }
+      }
+    }
+  }
+
+  function textoTempo(ms) {
+    return (ms / 1000).toFixed(1).replace(".", ",") + " s";
+  }
+
+  const ecra = p => ({ x: MARGEM + p.x * LADO, y: MARGEM + p.y * LADO });
+
+  // Número fixo a partir das coordenadas, para as casas não mudarem entre frames.
+  const variacao = (a, b) => ((a * 7 + b * 13) % 5) / 5;
+
+  function desenharQuarteirao(c, l) {
+    const x = MARGEM + c * LADO + 18;
+    const y = MARGEM + l * LADO + 18;
+    const lado = LADO - 36;
+    if (mapa.jardins.includes(`${c},${l}`)) {
+      ctx.fillStyle = CORES.jardim;
+      ctx.fillRect(x, y, lado, lado);
+      ctx.fillStyle = CORES.arvore;
+      for (let i = 0; i < 6; i++) {
+        ctx.beginPath();
+        ctx.arc(x + 12 + (i % 3) * 25, y + 20 + (i > 2 ? 34 : 0) + variacao(c + i, l) * 6, 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return;
+    }
+    ctx.fillStyle = CORES.quarteirao;
+    ctx.fillRect(x, y, lado, lado);
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = variacao(c + i, l + i) > 0.4 ? CORES.casa : CORES["casa-clara"];
+      ctx.fillRect(x + 6 + (i % 2) * 32, y + 6 + (i > 1 ? 32 : 0), 24, 24);
+    }
+  }
+
+  function linha(a, b, largura, estilo, tracejado) {
+    ctx.strokeStyle = estilo;
+    ctx.lineWidth = largura;
+    ctx.lineCap = "round";
+    ctx.setLineDash(tracejado || []);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function posicaoAtual() {
+    const a = ecra(jogo.pos);
+    if (!jogo.destino) return a;
+    const b = ecra(jogo.destino);
+    return { x: a.x + (b.x - a.x) * jogo.progresso, y: a.y + (b.y - a.y) * jogo.progresso };
+  }
+
+  function desenhar() {
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    ctx.fillStyle = CORES.noite;
+    ctx.fillRect(0, 0, 870, 540);
+    for (let l = 0; l < LINHAS - 1; l++) {
+      for (let c = 0; c < COLUNAS - 1; c++) desenharQuarteirao(c, l);
+    }
+    for (const [a, b] of RUAS) linha(ecra(a), ecra(b), 24, CORES.asfalto);
+    for (const [a, b] of RUAS) linha(ecra(a), ecra(b), 2, CORES.tracejado, [8, 10]);
+    for (const [a, b] of RUAS) {
+      const id = idRua(a, b);
+      if (!jogo.percorridas.has(id)) continue;
+      const aAndar = jogo.destino && idRua(jogo.pos, jogo.destino) === id;
+      if (aAndar) linha(ecra(jogo.pos), posicaoAtual(), 8, CORES.percorrida);
+      else linha(ecra(a), ecra(b), 8, CORES.percorrida);
+    }
+    const p = posicaoAtual();
+    ctx.fillStyle = CORES.corredor;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  let anterior = performance.now();
+  function ciclo(agora) {
+    atualizar(agora - anterior, agora);
+    anterior = agora;
+    desenhar();
+    document.getElementById("tempo").textContent = textoTempo(tempoTotal(agora));
+    document.getElementById("mapa-atual").textContent = `${Math.min(corrida.mapas + 1, MAPAS_POR_CORRIDA)} de ${MAPAS_POR_CORRIDA}`;
+    document.getElementById("ruas").textContent = `${jogo.percorridas.size} de ${RUAS.length}`;
+    requestAnimationFrame(ciclo);
+  }
+
+  const SETAS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+  window.addEventListener("keydown", e => {
+    if (porNomear) return;
+    if (e.key === "r" || e.key === "R") return novoJogo();
+    if (!SETAS[e.key]) return;
+    e.preventDefault();
+    mover(...SETAS[e.key]);
+  });
+
+  for (const [id, seta] of [["cima", "ArrowUp"], ["baixo", "ArrowDown"], ["esquerda", "ArrowLeft"], ["direita", "ArrowRight"]]) {
+    document.getElementById(id).addEventListener("click", () => mover(...SETAS[seta]));
+  }
+
+  document.getElementById("formulario").addEventListener("submit", e => {
+    e.preventDefault();
+    fecharNome(document.getElementById("nome").value.trim());
+  });
+  document.getElementById("nome-aleatorio").addEventListener("click", () => fecharNome(""));
+
+  novoJogo();
+  canvas.focus();
+  requestAnimationFrame(ciclo);
+</script>
+</body>
+</html>
