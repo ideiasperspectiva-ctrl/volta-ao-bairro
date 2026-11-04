@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Testes do Volta ao Bairro</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --fundo: #16212a;
+    --texto: #eef3f6;
+    --suave: #a9bac6;
+    --passou: #4ba873;
+    --falhou: #ff6a4d;
+  }
+  body { margin: 0; background: var(--fundo); color: var(--texto); font: 16px/1.5 "Segoe UI", sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 24px 16px; display: grid; gap: 12px; }
+  h1 { margin: 0; font-size: 1.6rem; }
+  ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  li { padding: 10px 12px; border-left: 4px solid var(--suave); background: #22313c; }
+  li.passou { border-color: var(--passou); }
+  li.falhou { border-color: var(--falhou); }
+  li small { display: block; color: var(--suave); }
+  #resumo { font-weight: 600; }
+  iframe { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Testes do Volta ao Bairro</h1>
+  <p id="resumo">A carregar o jogo…</p>
+  <ol id="resultados"></ol>
+</main>
+<iframe id="jogo"></iframe>
+
+<script>
+  // Cada teste recebe "j", que avalia código dentro do jogo, e devolve
+  // { ok, detalhe }. O detalhe explica o que se esperava e o que aconteceu.
+  const TESTES = [
+    {
+      nome: "Uma rua livre conta como saída, seja qual for a direção",
+      testar(j) {
+        j("mapa = MAPA_INICIAL; iniciarMapa();");
+        const direcoes = { direita: [1, 0], esquerda: [-1, 0], baixo: [0, 1], cima: [0, -1] };
+        const falharam = [];
+        for (const [nome, [dx, dy]] of Object.entries(direcoes)) {
+          // Procura um cruzamento com rua nessa direção e deixa só essa livre.
+          const resultado = j(`(() => {
+            for (const [a, b] of RUAS) {
+              for (const [p, q] of [[a, b], [b, a]]) {
+                if (q.x - p.x !== ${dx} || q.y - p.y !== ${dy}) continue;
+                jogo.percorridas = new Set(RUAS.map(([u, v]) => idRua(u, v)));
+                jogo.percorridas.delete(idRua(p, q));
+                return temSaida(p);
+              }
+            }
+            return null;
+          })()`);
+          if (resultado !== true) falharam.push(nome);
+        }
+        return {
+          ok: falharam.length === 0,
+          detalhe: falharam.length ? `Não viu a saída para: ${falharam.join(", ")}` : "As 4 direções são verificadas.",
+        };
+      },
+    },
+    {
+      nome: "Sem ruas livres à volta, não há saída",
+      testar(j) {
+        const resultado = j(`(() => {
+          mapa = MAPA_INICIAL; iniciarMapa();
+          jogo.percorridas = new Set(RUAS.map(([u, v]) => idRua(u, v)));
+          return temSaida(MAPA_INICIAL.inicio);
+        })()`);
+        return { ok: resultado === false, detalhe: `Esperado: sem saída. Obtido: ${resultado ? "com saída" : "sem saída"}.` };
+      },
+    },
+    {
+      nome: "Cada rua falhada soma 5 segundos",
+      testar(j) {
+        const oito = j("textoTempo(8 * PENALIZACAO)");
+        return { ok: oito === "40,0 s", detalhe: `8 ruas falhadas: esperado 40,0 s, obtido ${oito}.` };
+      },
+    },
+    {
+      nome: "O ranking põe o menor tempo em primeiro",
+      testar(j) {
+        const ordem = j("ordenar([{ tempo: 90000 }, { tempo: 40000 }, { tempo: 60000 }]).map(r => r.tempo / 1000)");
+        return { ok: ordem.join() === "40,60,90", detalhe: `Esperado 40, 60, 90. Obtido ${ordem.join(", ")}.` };
+      },
+    },
+    {
+      nome: "Os mapas aleatórios têm sempre solução",
+      testar(j) {
+        const sem = j(`(() => {
+          let semSolucao = 0;
+          for (let i = 0; i < 30; i++) {
+            const m = gerarMapa();
+            const lista = vizinhos(m.ruas);
+            const impares = [...lista.keys()].filter(v => lista.get(v).length % 2 === 1);
+            const ligado = alcancaveis(lista, chave(m.inicio)).size === lista.size;
+            if (!ligado || impares.length !== 2 || !impares.includes(chave(m.inicio))) semSolucao++;
+          }
+          return semSolucao;
+        })()`);
+        return { ok: sem === 0, detalhe: `30 mapas gerados, ${sem} sem solução.` };
+      },
+    },
+  ];
+
+  const moldura = document.getElementById("jogo");
+  moldura.addEventListener("load", e => {
+    const j = codigo => e.target.contentWindow.eval(codigo);
+    const lista = document.getElementById("resultados");
+    let passaram = 0;
+    for (const teste of TESTES) {
+      let resultado;
+      try {
+        resultado = teste.testar(j);
+      } catch (erro) {
+        resultado = { ok: false, detalhe: `Erro: ${erro.message}` };
+      }
+      if (resultado.ok) passaram++;
+      const li = document.createElement("li");
+      li.className = resultado.ok ? "passou" : "falhou";
+      li.textContent = `${resultado.ok ? "✓" : "✗"} ${teste.nome}`;
+      const detalhe = document.createElement("small");
+      detalhe.textContent = resultado.detalhe;
+      li.append(detalhe);
+      lista.append(li);
+    }
+    document.getElementById("resumo").textContent = `${passaram} de ${TESTES.length} testes passaram.`;
+    document.title = `${passaram}/${TESTES.length} · Testes do Volta ao Bairro`;
+  });
+  // O número no endereço obriga o browser a ir buscar a versão atual do jogo,
+  // em vez de usar uma cópia antiga guardada em cache.
+  moldura.src = "../index.html?v=" + Date.now();
+</script>
+</body>
+</html>
