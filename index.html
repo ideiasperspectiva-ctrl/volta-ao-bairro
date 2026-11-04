@@ -139,7 +139,7 @@
   const DURACAO = 130;
   const NOMES = ["Raposa", "Coruja", "Lince", "Gaivota", "Lontra", "Texugo", "Andorinha", "Golfinho", "Esquilo", "Pardal"];
   const MAPAS_POR_CORRIDA = 5;
-  const PENALIZACAO = 500;
+  const PENALIZACAO = 5000;
 
   // Troços sem rua. Só o início e o fim têm um número ímpar de ruas, e é isso
   // que garante que o bairro tem solução.
@@ -375,7 +375,7 @@
   }
 
   function temSaida(p) {
-    return [[1, 0], [-1, 0], [0, 1]].some(([dx, dy]) => {
+    return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
       const alvo = { x: p.x + dx, y: p.y + dy };
       return existeRua(p, alvo) && !jogo.percorridas.has(idRua(p, alvo));
     });
@@ -383,7 +383,7 @@
 
   // Ganha o menor tempo total, já com as penalizações.
   function ordenar(resultados) {
-    return [...resultados].sort((a, b) => b.tempo - a.tempo);
+    return [...resultados].sort((a, b) => a.tempo - b.tempo);
   }
 
   const baseDeDados = window.claude ? window.claude.use("db").catch(() => null) : Promise.resolve(null);
